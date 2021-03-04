@@ -20,7 +20,6 @@ const normalizeCsvLine = (line) => {
   if (row[0] === 'Timestamp') {
     return line
   }
-
   // INDEX 0: address DateTime
   const date = new Date(row[0])
   // date is in Pacific Time. convert to Eastern (add 3 hours)
@@ -51,8 +50,12 @@ const main = () => {
   })
 
   rl.on('line', (line) => {
-    const normalizedLine = normalizeCsvLine(line)
-    console.log(normalizedLine)
+    try {
+      const normalizedLine = normalizeCsvLine(line)
+      console.log(normalizedLine)
+    } catch (err) {
+      console.error(err)
+    }
   });
 }
 
