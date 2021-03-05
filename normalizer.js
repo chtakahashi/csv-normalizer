@@ -2,9 +2,18 @@
 
 const readline = require('readline')
 
-// split the incoming csv string with care for commas that appear inside quotes
+// split the incoming csv line with care for commas that appear inside quotes
 const split = (line) => {
   return line.match(/("[^"]*")|[^,]+/g)
+}
+
+// replace invalid UTF8 characters
+const replaceInvalidUtf = (str) => {
+  if (typeof str === 'number' || typeof str === 'float') {
+    return str
+  }
+  const buf = Buffer.from(str || '', 'utf8')
+  return buf.toString()
 }
 
 const convertDurationToSeconds = (time) => {
@@ -12,6 +21,22 @@ const convertDurationToSeconds = (time) => {
   return parseInt(temp[0]) * 3600
     + parseInt(temp[1]) * 60
     + parseFloat(temp[2])
+}
+
+const convertRfc = (date) => {
+  function pad(number) {
+    if (number < 10) {
+      return '0' + number;
+    }
+    return number;
+  }
+  return date.getUTCFullYear() +
+    '-' + pad(date.getUTCMonth() + 1) +
+    '-' + pad(date.getUTCDate()) +
+    'T' + pad(date.getUTCHours()) +
+    ':' + pad(date.getUTCMinutes()) +
+    ':' + pad(date.getUTCSeconds()) +
+    'Z';
 }
 
 const normalizeCsvLine = (line) => {
@@ -24,23 +49,26 @@ const normalizeCsvLine = (line) => {
   const date = new Date(row[0])
   // date is in Pacific Time. convert to Eastern (add 3 hours)
   date.setHours(date.getHours() + 3)
-  row[0] = date.toISOString()
+  row[0] = convertRfc(date)
   // INDEX 1: no transformations other than Unicode verification
-
-  // INDEX 2: ensure each zip code is 5 digits
+  // INDEX 2: ensure each zip code is 5 digits.
   row[2] = `00000${row[2]}`.slice(-5)
-
   // INDEX 3: FullName - capitalize
   row[3] = row[3].toUpperCase()
-
-  // INDEX 4: FooDuration - convert to seconds
-  row[4] = convertDurationToSeconds(row[4])
-  // INDEX 5: BarDuration - convert to seconds
-  row[5] = convertDurationToSeconds(row[5])
+  // INDEX 4 and 5: FooDuration, BarDuration - convert to seconds
+  const foo = convertDurationToSeconds(row[4])
+  const bar = convertDurationToSeconds(row[5])
+  if (isNaN(foo) || isNaN(bar)) {
+    throw new Error('cannot parse foo or barDuration')
+  }
+  row[4] = foo.toFixed(3)
+  row[5] = bar.toFixed(3)
   // INDEX 6: replace contents with foo + bar
-  row[6] = row[4] + row[5]
+  row[6] = (foo + bar).toFixed(3)
   // INDEX 7: no transformations other than Unicode verification
-  return row.join(',')
+
+  // unicode verification
+  return row.map((col) => replaceInvalidUtf(col)).join(',')
 }
 
 const main = () => {
